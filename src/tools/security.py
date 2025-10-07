@@ -1,14 +1,19 @@
 import datetime
+import logging
 
 from fastapi import HTTPException, Request, status
 from fastapi.security import HTTPBearer
-from jose import jwt
+from jose import jwt, JWSError
+from jose.exceptions import JWTClaimsError, ExpiredSignatureError, JWTError
 from passlib.context import CryptContext
 
 from config.auth import AuthSettings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 auth_settings = AuthSettings()
+
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -27,7 +32,9 @@ def create_access_token(data: dict) -> str:
             + datetime.timedelta(minutes=auth_settings.access_token_expire_minutes)
         }
     )
-    return jwt.encode(to_encode, auth_settings.secret_key, algorithm=auth_settings.algorithm)
+    return jwt.encode(
+        to_encode, auth_settings.secret_key, algorithm=auth_settings.algorithm
+    )
 
 
 def decode_access_token(token: str):
@@ -35,8 +42,11 @@ def decode_access_token(token: str):
         encoded_jwt = jwt.decode(
             token, auth_settings.secret_key, algorithms=[auth_settings.algorithm]
         )
-    except jwt.JWSError:
+    except (JWTError, JWTClaimsError, JWSError) as e:
+        logger.exception("JWT decoding error: %s", e)
         return None
+    except ExpiredSignatureError:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Expired token")
     return encoded_jwt
 
 
@@ -46,7 +56,9 @@ class JWTBearer(HTTPBearer):
 
     async def __call__(self, request: Request):
         credentials = await super(JWTBearer, self).__call__(request)
-        exp = HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid auth token")
+        exp = HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid auth token"
+        )
         if credentials:
             token = decode_access_token(credentials.credentials)
             if token is None:
