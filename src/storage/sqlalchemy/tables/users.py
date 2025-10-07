@@ -16,7 +16,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(comment="Зашифрованный пароль")
     is_company: Mapped[bool] = mapped_column(comment="Флаг компании")
     created_at: Mapped[datetime] = mapped_column(
-        comment="Время создания записи", default=datetime.utcnow
+        comment="Дата создания строки", default=datetime.utcnow
     )
 
     jobs: Mapped[list["Job"]] = relationship(  # noqa
