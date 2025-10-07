@@ -3,7 +3,7 @@ from dataclasses import asdict
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from dependencies import get_current_user
+from dependencies import get_current_user, is_company
 from dependencies.containers import RepositoriesContainer
 from models import User
 from repositories.job_repository import JobRepository
@@ -59,7 +59,9 @@ async def read_job(
     return job_schema
 
 
-@router.post("", description="Создание новой вакансии")
+@router.post(
+    "", description="Создание новой вакансии", dependencies=[Depends(is_company)]
+)
 @inject
 async def create_job(
     job_create_dto: JobCreateSchema,
@@ -74,7 +76,11 @@ async def create_job(
     return JobSchema(**asdict(user))
 
 
-@router.patch("/{job_id}", description="Редактирование вакансии")
+@router.patch(
+    "/{job_id}",
+    description="Редактирование вакансии",
+    dependencies=[Depends(is_company)],
+)
 @inject
 async def update_job(
     job_id: int,

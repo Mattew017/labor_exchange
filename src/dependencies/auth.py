@@ -9,7 +9,9 @@ from tools.security import JWTBearer, decode_access_token
 
 @inject
 async def get_current_user(
-    user_repository: UserRepository = Depends(Provide[RepositoriesContainer.user_repository]),
+    user_repository: UserRepository = Depends(
+        Provide[RepositoriesContainer.user_repository]
+    ),
     token: str = Depends(JWTBearer()),
 ) -> User:
     cred_exception = HTTPException(
@@ -25,3 +27,15 @@ async def get_current_user(
     if user is None:
         raise cred_exception
     return user
+
+
+@inject
+async def is_employee(user: User = Depends(get_current_user)):
+    if user.is_company:
+        raise HTTPException(status_code=403)
+
+
+@inject
+async def is_company(user: User = Depends(get_current_user)):
+    if not user.is_company:
+        raise HTTPException(status_code=403)
