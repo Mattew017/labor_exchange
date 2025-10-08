@@ -9,7 +9,7 @@ class RepositoriesContainer(containers.DeclarativeContainer):
         packages=["web.routers", "dependencies"]
     )
 
-    db = providers.AbstractFactory(ISQLAlchemy)
+    db = providers.Singleton(ISQLAlchemy)
 
     user_repository = providers.Factory(
         UserRepository,

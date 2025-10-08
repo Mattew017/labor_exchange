@@ -54,7 +54,7 @@ def create_app():
 
     # выбор синхронных / асинхронных реализаций
     repo_container.db.override(
-        providers.Factory(
+        providers.Singleton(
             SqlAlchemyAsync,
             pg_settings=settings,
         ),
