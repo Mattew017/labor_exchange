@@ -9,8 +9,16 @@ from fastapi import FastAPI
 from config import DBSettings
 from dependencies.containers import RepositoriesContainer
 from storage.sqlalchemy.client import SqlAlchemyAsync
-from tools.exceptions import EntityNotFoundError
-from tools.handlers import not_found_exception_handler
+from tools.exceptions import (
+    EntityNotFoundError,
+    InactiveJobError,
+    DuplicateResponseError,
+)
+from tools.handlers import (
+    not_found_exception_handler,
+    inactive_job_exception_handler,
+    duplicate_response_exception_handler,
+)
 from web.routers import auth_router, user_router, job_router
 
 env_file_name = ".env." + os.environ.get("STAGE", "dev")
@@ -19,6 +27,10 @@ env_file_path = Path(__file__).parent.resolve() / env_file_name
 
 def add_exception_handlers(application: FastAPI):
     application.add_exception_handler(EntityNotFoundError, not_found_exception_handler)
+    application.add_exception_handler(InactiveJobError, inactive_job_exception_handler)
+    application.add_exception_handler(
+        DuplicateResponseError, duplicate_response_exception_handler
+    )
 
 
 def create_app():
