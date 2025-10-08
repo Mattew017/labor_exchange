@@ -9,6 +9,7 @@ from models import Job as JobModel
 from models import Response as ResponseModel
 from models import User as UserModel
 from storage.sqlalchemy.tables import User
+from tools.exceptions import EntityNotFoundError
 from web.schemas import UserCreateSchema, UserUpdateSchema
 
 
@@ -16,7 +17,9 @@ class UserRepository(IRepositoryAsync):
     def __init__(self, session: Callable[..., AbstractContextManager[Session]]):
         self.session = session
 
-    async def create(self, user_create_dto: UserCreateSchema, hashed_password: str) -> UserModel:
+    async def create(
+        self, user_create_dto: UserCreateSchema, hashed_password: str
+    ) -> UserModel:
         async with self.session() as session:
             user = User(
                 name=user_create_dto.name,
@@ -35,10 +38,14 @@ class UserRepository(IRepositoryAsync):
         async with self.session() as session:
             query = select(User).filter_by(**kwargs).limit(1)
             if include_relations:
-                query = query.options(selectinload(User.jobs)).options(selectinload(User.responses))
+                query = query.options(selectinload(User.jobs)).options(
+                    selectinload(User.responses)
+                )
 
             res = await session.execute(query)
             user_from_db = res.scalars().first()
+            if not user_from_db:
+                raise EntityNotFoundError("Пользователь не найден")
 
         user_model = self.__to_user_model(
             user_from_db=user_from_db, include_relations=include_relations
@@ -51,14 +58,18 @@ class UserRepository(IRepositoryAsync):
         async with self.session() as session:
             query = select(User).limit(limit).offset(skip)
             if include_relations:
-                query = query.options(selectinload(User.jobs)).options(selectinload(User.responses))
+                query = query.options(selectinload(User.jobs)).options(
+                    selectinload(User.responses)
+                )
 
             res = await session.execute(query)
             users_from_db = res.scalars().all()
 
         users_model = []
         for user in users_from_db:
-            model = self.__to_user_model(user_from_db=user, include_relations=include_relations)
+            model = self.__to_user_model(
+                user_from_db=user, include_relations=include_relations
+            )
             users_model.append(model)
 
         return users_model
@@ -70,11 +81,17 @@ class UserRepository(IRepositoryAsync):
             user_from_db = res.scalars().first()
 
             if not user_from_db:
-                raise ValueError("Пользователь не найден")
+                raise EntityNotFoundError("Пользователь не найден")
 
-            name = user_update_dto.name if user_update_dto.name is not None else user_from_db.name
+            name = (
+                user_update_dto.name
+                if user_update_dto.name is not None
+                else user_from_db.name
+            )
             email = (
-                user_update_dto.email if user_update_dto.email is not None else user_from_db.email
+                user_update_dto.email
+                if user_update_dto.email is not None
+                else user_from_db.email
             )
             is_company = (
                 user_update_dto.is_company
@@ -103,12 +120,14 @@ class UserRepository(IRepositoryAsync):
                 await session.delete(user_from_db)
                 await session.commit()
             else:
-                raise ValueError("Пользователь не найден")
+                raise EntityNotFoundError("Пользователь не найден")
 
         return self.__to_user_model(user_from_db, include_relations=False)
 
     @staticmethod
-    def __to_user_model(user_from_db: User, include_relations: bool = False) -> UserModel:
+    def __to_user_model(
+        user_from_db: User, include_relations: bool = False
+    ) -> UserModel:
         user_jobs = []
         user_responses = []
         user_model = None
@@ -119,7 +138,8 @@ class UserRepository(IRepositoryAsync):
                     user_jobs = [JobModel(id=job.id) for job in user_from_db.jobs]
                 else:
                     user_responses = [
-                        ResponseModel(id=response.id) for response in user_from_db.responses
+                        ResponseModel(id=response.id)
+                        for response in user_from_db.responses
                     ]
 
             user_model = UserModel(
