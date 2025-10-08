@@ -5,6 +5,7 @@ from pathlib import Path
 import uvicorn
 from dependency_injector import providers
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
 from config import DBSettings
 from dependencies.containers import RepositoriesContainer
@@ -13,11 +14,14 @@ from tools.exceptions import (
     EntityNotFoundError,
     InactiveJobError,
     DuplicateResponseError,
+    InvalidSalaryRangeError,
 )
 from tools.handlers import (
     not_found_exception_handler,
     inactive_job_exception_handler,
     duplicate_response_exception_handler,
+    invalid_salary_range_exception_handler,
+    input_params_validation_exception_handler,
 )
 from web.routers import auth_router, user_router, job_router, response_router
 
@@ -26,10 +30,16 @@ env_file_path = Path(__file__).parent.resolve() / env_file_name
 
 
 def add_exception_handlers(application: FastAPI):
+    application.add_exception_handler(
+        RequestValidationError, input_params_validation_exception_handler
+    )
     application.add_exception_handler(EntityNotFoundError, not_found_exception_handler)
     application.add_exception_handler(InactiveJobError, inactive_job_exception_handler)
     application.add_exception_handler(
         DuplicateResponseError, duplicate_response_exception_handler
+    )
+    application.add_exception_handler(
+        InvalidSalaryRangeError, invalid_salary_range_exception_handler
     )
 
 

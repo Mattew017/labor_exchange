@@ -5,6 +5,7 @@ from dependencies import get_current_user, is_company
 from dependencies.containers import RepositoriesContainer
 from models import User
 from repositories.job_repository import JobRepository
+from tools.exceptions import InvalidSalaryRangeError
 from web.schemas.job import JobSchema, JobCreateSchema, JobUpdateSchema
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -110,23 +111,17 @@ async def update_job(
         and new_salary_to is not None
         and new_salary_from > new_salary_to
     ):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"{new_salary_from=} cannot be greater than {new_salary_to=}",
-        )
-    try:
-        updated_job = await job_repository.update(existing_job.id, job_update_schema)
-        return JobSchema(
-            id=updated_job.id,
-            user_id=current_user.id,
-            title=updated_job.title,
-            description=updated_job.description,
-            salary_from=updated_job.salary_from,
-            salary_to=updated_job.salary_to,
-            is_active=updated_job.is_active,
+        raise InvalidSalaryRangeError(
+            salary_from=new_salary_from, salary_to=new_salary_to
         )
 
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Вакансия не найдена"
-        )
+    updated_job = await job_repository.update(existing_job.id, job_update_schema)
+    return JobSchema(
+        id=updated_job.id,
+        user_id=current_user.id,
+        title=updated_job.title,
+        description=updated_job.description,
+        salary_from=updated_job.salary_from,
+        salary_to=updated_job.salary_to,
+        is_active=updated_job.is_active,
+    )

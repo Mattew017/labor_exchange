@@ -3,6 +3,8 @@ from typing import Self
 
 from pydantic import BaseModel, model_validator, Field
 
+from tools.exceptions import InvalidSalaryRangeError
+
 
 class JobSchema(BaseModel):
     id: int
@@ -30,7 +32,7 @@ class JobCreateSchema(BaseModel):
             and salary_to is not None
             and salary_from > salary_to
         ):
-            raise ValueError(f"{salary_from=} cannot be greater than {salary_to=}")
+            raise InvalidSalaryRangeError(salary_from, salary_to)
         return self
 
 
