@@ -28,6 +28,7 @@ async def read_jobs(
         jobs_schema.append(
             JobSchema(
                 id=model.id,
+                user_id=model.user_id,
                 title=model.title,
                 description=model.description,
                 salary_from=model.salary_from,
@@ -50,6 +51,7 @@ async def read_job(
 
     job_schema = JobSchema(
         id=job_model.id,
+        user_id=job_model.user_id,
         title=job_model.title,
         description=job_model.description,
         salary_from=job_model.salary_from,
@@ -73,7 +75,15 @@ async def create_job(
     job = await job_repository.create(
         job_create_dto=job_create_dto, user_id=current_user.id
     )
-    return JobSchema(**asdict(job))
+    return JobSchema(
+        id=job.id,
+        user_id=current_user.id,
+        title=job.title,
+        description=job.description,
+        salary_from=job.salary_from,
+        salary_to=job.salary_to,
+        is_active=job.is_active,
+    )
 
 
 @router.patch(
@@ -108,7 +118,15 @@ async def update_job(
         )
     try:
         updated_job = await job_repository.update(existing_job.id, job_update_schema)
-        return JobSchema(**asdict(updated_job))
+        return JobSchema(
+            id=updated_job.id,
+            user_id=current_user.id,
+            title=updated_job.title,
+            description=updated_job.description,
+            salary_from=updated_job.salary_from,
+            salary_to=updated_job.salary_to,
+            is_active=updated_job.is_active,
+        )
 
     except ValueError:
         raise HTTPException(
