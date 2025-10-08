@@ -19,7 +19,7 @@ from tools.handlers import (
     inactive_job_exception_handler,
     duplicate_response_exception_handler,
 )
-from web.routers import auth_router, user_router, job_router
+from web.routers import auth_router, user_router, job_router, response_router
 
 env_file_name = ".env." + os.environ.get("STAGE", "dev")
 env_file_path = Path(__file__).parent.resolve() / env_file_name
@@ -57,6 +57,7 @@ def create_app():
     app.include_router(auth_router)
     app.include_router(user_router)
     app.include_router(job_router)
+    app.include_router(response_router)
 
     return app
 

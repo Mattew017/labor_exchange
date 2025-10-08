@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator, Field
 
 
 class JobSchema(BaseModel):
-    id: int | None = None
+    id: int
     title: str
     description: str
     salary_from: Decimal

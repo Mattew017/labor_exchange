@@ -70,10 +70,10 @@ async def create_job(
     ),
     current_user: User = Depends(get_current_user),
 ) -> JobSchema:
-    user = await job_repository.create(
+    job = await job_repository.create(
         job_create_dto=job_create_dto, user_id=current_user.id
     )
-    return JobSchema(**asdict(user))
+    return JobSchema(**asdict(job))
 
 
 @router.patch(
