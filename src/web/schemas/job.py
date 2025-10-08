@@ -15,10 +15,10 @@ class JobSchema(BaseModel):
 
 
 class JobCreateSchema(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    description: str = Field(min_length=1, max_length=1000)
-    salary_from: Decimal = Field(gt=0)
-    salary_to: Decimal = Field(gt=0)
+    title: str = Field(min_length=10, max_length=100)
+    description: str = Field(min_length=10, max_length=5000)
+    salary_from: Decimal = Field(ge=22400)
+    salary_to: Decimal = Field(ge=22400)
     is_active: bool
 
     @model_validator(mode="after")
@@ -35,8 +35,8 @@ class JobCreateSchema(BaseModel):
 
 
 class JobUpdateSchema(JobCreateSchema):
-    title: str | None = Field(default=None, min_length=1, max_length=100)
-    description: str | None = Field(default=None, min_length=1, max_length=1000)
-    salary_from: Decimal | None = Field(default=None, gt=0)
-    salary_to: Decimal | None = Field(default=None, gt=0)
+    title: str | None = Field(default=None, min_length=10, max_length=100)
+    description: str | None = Field(default=None, min_length=10, max_length=5000)
+    salary_from: Decimal | None = Field(default=None, ge=22400)
+    salary_to: Decimal | None = Field(default=None, ge=22400)
     is_active: bool | None = None
