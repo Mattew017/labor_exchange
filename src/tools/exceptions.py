@@ -1,7 +1,12 @@
 from decimal import Decimal
 
 
-class EntityNotFoundError(Exception):
+class DomainError(Exception):
+    def __repr__(self):
+        return str(self)
+
+
+class EntityNotFoundError(DomainError):
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
@@ -10,17 +15,17 @@ class EntityNotFoundError(Exception):
         return self.message
 
 
-class InactiveJobError(Exception):
+class InactiveJobError(DomainError):
     def __str__(self):
         return "Вакансия не активна"
 
 
-class DuplicateResponseError(Exception):
+class DuplicateResponseError(DomainError):
     def __str__(self):
         return "Дубликат отклика на вакансию"
 
 
-class InvalidSalaryRangeError(Exception):
+class InvalidSalaryRangeError(DomainError):
     def __init__(self, salary_from: Decimal, salary_to: Decimal):
         self.salary_from = salary_from
         self.salary_to = salary_to
