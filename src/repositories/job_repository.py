@@ -9,6 +9,7 @@ from interfaces import IRepositoryAsync
 from models import Job as JobModel
 from models import Response as ResponseModel
 from models import User as UserModel
+from repositories.mapper import DynamicMapper
 from storage.sqlalchemy.tables import Job
 from tools.exceptions import EntityNotFoundError
 from web.schemas.job import JobCreateSchema, JobUpdateSchema
@@ -17,8 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class JobRepository(IRepositoryAsync):
-    def __init__(self, session: Callable[..., AbstractContextManager[Session]]):
+    def __init__(
+        self,
+        session: Callable[..., AbstractContextManager[Session]],
+        mapper: DynamicMapper,
+    ):
         self.session = session
+        self.mapper = mapper
 
     async def create(self, job_create_dto: JobCreateSchema, user_id: int) -> JobModel:
         async with self.session() as session:
@@ -36,7 +42,7 @@ class JobRepository(IRepositoryAsync):
             await session.refresh(job)
 
         logger.debug("Created job %s user_id=%d", job.title, user_id)
-        return self.__to_job_model(job_from_db=job)
+        return self.mapper.map_to_model(job)
 
     async def retrieve(self, include_relations: bool = False, **kwargs) -> JobModel:
         async with self.session() as session:
@@ -50,8 +56,8 @@ class JobRepository(IRepositoryAsync):
             job_from_db = res.scalars().first()
         if job_from_db is None:
             raise EntityNotFoundError("Вакансия не найдена")
-        job_model = self.__to_job_model(
-            job_from_db=job_from_db, include_relations=include_relations
+        job_model = self.mapper.map_to_model(
+            job_from_db, include_relations=include_relations
         )
         logger.debug("Retrieved job id=%d", job_model.id)
         return job_model
@@ -71,9 +77,7 @@ class JobRepository(IRepositoryAsync):
 
         jobs_model = []
         for job in jobs_from_db:
-            model = self.__to_job_model(
-                job_from_db=job, include_relations=include_relations
-            )
+            model = self.mapper.map_to_model(job, include_relations=include_relations)
             jobs_model.append(model)
 
         return jobs_model
@@ -126,7 +130,7 @@ class JobRepository(IRepositoryAsync):
 
         logger.debug("Updated job id=%d", id_)
 
-        new_job = self.__to_job_model(job_from_db)
+        new_job = self.mapper.map_to_model(job_from_db)
         return new_job
 
     async def delete(self, id_: int):
@@ -142,40 +146,4 @@ class JobRepository(IRepositoryAsync):
             else:
                 raise EntityNotFoundError("Вакансия не найдена")
 
-        return self.__to_job_model(job_from_db)
-
-    @staticmethod
-    def __to_job_model(job_from_db: Job, include_relations: bool = False) -> JobModel:
-
-        job_user = None
-        job_responses = []
-
-        if include_relations:
-            job_user = UserModel(
-                id=job_from_db.user.id,
-                name=job_from_db.user.name,
-                email=job_from_db.user.email,
-                hashed_password=job_from_db.user.hashed_password,
-                is_company=job_from_db.user.is_company,
-            )
-            job_responses = [
-                ResponseModel(
-                    id=response.id,
-                    message=response.message,
-                )
-                for response in job_from_db.responses
-            ]
-
-        job_model = JobModel(
-            id=job_from_db.id,
-            user_id=job_from_db.user_id,
-            title=job_from_db.title,
-            description=job_from_db.description,
-            salary_from=job_from_db.salary_from,
-            salary_to=job_from_db.salary_to,
-            is_active=job_from_db.is_active,
-            user=job_user,
-            responses=job_responses,
-        )
-
-        return job_model
+        return self.mapper.map_to_model(job_from_db)
