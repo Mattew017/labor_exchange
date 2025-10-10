@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from repositories import UserRepository
 from storage.sqlalchemy.tables import Job
 from tools.fixtures.users import UserFactory
-from tools.security import hash_password
+from services.identity_provider import hash_password
 from web.schemas import UserCreateSchema, UserUpdateSchema
 
 
@@ -88,7 +88,9 @@ async def test_create_password_mismatch(sa_session):
             password2="eshkero!",
             is_company=False,
         )
-        await repository.create(user_create_dto=user, hashed_password=hash_password(user.password))
+        await repository.create(
+            user_create_dto=user, hashed_password=hash_password(user.password)
+        )
 
 
 @pytest.mark.asyncio
@@ -99,7 +101,9 @@ async def test_update(user_repository, sa_session):
         session.flush()
 
     user_update_dto = UserUpdateSchema(name="updated_name")
-    updated_user = await user_repository.update(id=user.id, user_update_dto=user_update_dto)
+    updated_user = await user_repository.update(
+        id=user.id, user_update_dto=user_update_dto
+    )
     assert user.id == updated_user.id
     assert updated_user.name == "updated_name"
 

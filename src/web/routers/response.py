@@ -1,12 +1,9 @@
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends
 
-from dependencies import get_current_user, is_company, is_employee
-from dependencies.containers import RepositoriesContainer
-from models import User
-from repositories.job_repository import JobRepository
-from repositories.response_repository import ResponseRepository
-from tools.exceptions import InactiveJobError, DuplicateResponseError
+from dependencies.containers import Container, get_identity_provider
+from interfaces.i_identity_provider import IdentityProvider
+from services.factory import ServicesFactory
 from web.schemas.response import ResponseSchema, ResponseCreateSchema
 
 router = APIRouter(prefix="", tags=["responses"])
@@ -15,22 +12,16 @@ router = APIRouter(prefix="", tags=["responses"])
 @router.get(
     "/responses",
     description="Получение списка всех откликов",
-    dependencies=[Depends(is_employee)],
 )
 @inject
 async def read_responses(
     limit: int = 100,
     skip: int = 0,
-    response_repository: ResponseRepository = Depends(
-        Provide[RepositoriesContainer.response_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> list[ResponseSchema]:
-    responses_model = await response_repository.retrieve_many(
-        limit,
-        skip,
-        include_relations=True,
-    )
-
+    service = services_factory.get_response_service(identity_provider)
+    responses_model = await service.get_all_active_responses(limit, skip)
     responses_schema = []
     for model in responses_model:
         if model.job.is_active:
@@ -48,27 +39,18 @@ async def read_responses(
 @router.get(
     "/jobs/{job_id}/responses",
     description="Получение списка всех откликов на определённую вакансию",
-    dependencies=[Depends(is_company)],
 )
 @inject
 async def read_job_responses(
     job_id: int,
     limit: int = 100,
     skip: int = 0,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
-    response_repository: ResponseRepository = Depends(
-        Provide[RepositoriesContainer.response_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> list[ResponseSchema]:
-    job_model = await job_repository.retrieve(id=job_id)
-    responses_model = await response_repository.retrieve_many(
-        limit,
-        skip,
-        include_relations=True,
-        job_id=job_id,
-    )
+    service = services_factory.get_response_service(identity_provider)
+    responses_model = await service.get_by_job_id(job_id, limit, skip)
+
     responses_schema = []
     for model in responses_model:
         responses_schema.append(
@@ -86,36 +68,21 @@ async def read_job_responses(
 @router.post(
     "/jobs/{job_id}/responses",
     description="Отклик на вакансию",
-    dependencies=[Depends(is_employee)],
 )
 @inject
 async def create_response(
     job_id: int,
     response_create_dto: ResponseCreateSchema,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
-    response_repository: ResponseRepository = Depends(
-        Provide[RepositoriesContainer.response_repository]
-    ),
-    current_user: User = Depends(get_current_user),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> ResponseSchema:
-    job_model = await job_repository.retrieve(id=job_id)
-    if not job_model.is_active:
-        raise InactiveJobError()
-
-    response_model = await response_repository.retrieve_many(
-        limit=1, skip=0, job_id=job_id, user_id=current_user.id
-    )
-    if len(response_model) > 0:
-        raise DuplicateResponseError()
-
-    new_response = await response_repository.create(
-        response_create_dto, job_id=job_id, user_id=current_user.id
-    )
+    service = services_factory.get_response_service(identity_provider)
+    result = await service.create(job_id, response_create_dto)
+    new_response = result.response
+    user_id = result.user_id
     return ResponseSchema(
         id=new_response.id,
         message=new_response.message,
-        user_id=current_user.id,
+        user_id=user_id,
         job_id=job_id,
     )

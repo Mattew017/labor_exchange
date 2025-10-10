@@ -1,12 +1,15 @@
 from dependency_injector import containers, providers
+from dependency_injector.wiring import Provide, inject
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials
 
-from interfaces.i_sqlalchemy import ISQLAlchemy
+from interfaces import ISQLAlchemy
+from models import User as UserModel, Job as JobModel, Response as ResponseModel
 from repositories import UserRepository, JobRepository, ResponseRepository
 from repositories.mapper import MapperFactory
-from storage.sqlalchemy.tables import Job, User, Response
-from models import User as UserModel
-from models import Job as JobModel
-from models import Response as ResponseModel
+from services.factory import ServicesFactory
+from services.identity_provider import JWTIdentityProvider, http_credentials_security
+from storage.sqlalchemy.tables import User, Job, Response
 
 
 def setup_mappers():
@@ -38,9 +41,9 @@ def setup_mappers():
     return factory
 
 
-class RepositoriesContainer(containers.DeclarativeContainer):
+class Container(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
-        packages=["web.routers", "dependencies"]
+        packages=["web.routers", "dependencies", "services"]
     )
 
     db = providers.Singleton(ISQLAlchemy)
@@ -74,3 +77,23 @@ class RepositoriesContainer(containers.DeclarativeContainer):
         session=db.provided.get_db,
         mapper=response_mapper,
     )
+
+    identity_provider = providers.Factory(
+        JWTIdentityProvider,
+        user_repository=user_repository,
+    )
+
+    services_factory = providers.Factory(
+        ServicesFactory,
+        user_repository=user_repository,
+        job_repository=job_repository,
+        response_repository=response_repository,
+    )
+
+
+@inject
+def get_identity_provider(
+    token: HTTPAuthorizationCredentials = Depends(http_credentials_security),
+    user_repository: UserRepository = Depends(Provide[Container.user_repository]),
+) -> JWTIdentityProvider:
+    return JWTIdentityProvider(user_repository=user_repository, token=token.credentials)

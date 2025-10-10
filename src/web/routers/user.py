@@ -1,13 +1,11 @@
 from dataclasses import asdict
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from dependencies import get_current_user
-from dependencies.containers import RepositoriesContainer
-from models import User
-from repositories import UserRepository
-from tools.security import hash_password
+from dependencies.containers import Container, get_identity_provider
+from interfaces.i_identity_provider import IdentityProvider
+from services.factory import ServicesFactory
 from web.schemas import UserCreateSchema, UserSchema, UserUpdateSchema
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -18,11 +16,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def read_users(
     limit: int = 100,
     skip: int = 0,
-    user_repository: UserRepository = Depends(
-        Provide[RepositoriesContainer.user_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> list[UserSchema]:
-    users_model = await user_repository.retrieve_many(limit, skip)
+    service = services_factory.get_user_service(identity_provider=identity_provider)
+    users_model = await service.get_all_users(limit, skip)
 
     users_schema = []
     for model in users_model:
@@ -41,16 +39,16 @@ async def read_users(
 @inject
 async def read_users(
     user_id: int,
-    user_repository: UserRepository = Depends(
-        Provide[RepositoriesContainer.user_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> UserSchema:
-    users_model = await user_repository.retrieve(id=user_id)
+    service = services_factory.get_user_service(identity_provider=identity_provider)
+    user_model = await service.get_user_by_id(user_id)
     user_schema = UserSchema(
-        id=users_model.id,
-        name=users_model.name,
-        email=users_model.email,
-        is_company=users_model.is_company,
+        id=user_model.id,
+        name=user_model.name,
+        email=user_model.email,
+        is_company=user_model.is_company,
     )
     return user_schema
 
@@ -59,13 +57,12 @@ async def read_users(
 @inject
 async def create_user(
     user_create_dto: UserCreateSchema,
-    user_repository: UserRepository = Depends(
-        Provide[RepositoriesContainer.user_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> UserSchema:
-    user = await user_repository.create(
-        user_create_dto, hashed_password=hash_password(user_create_dto.password)
-    )
+    service = services_factory.get_user_service(identity_provider=identity_provider)
+    user = await service.create(user_create_dto)
+
     return UserSchema(**asdict(user))
 
 
@@ -73,23 +70,10 @@ async def create_user(
 @inject
 async def update_user(
     user_update_schema: UserUpdateSchema,
-    user_repository: UserRepository = Depends(
-        Provide[RepositoriesContainer.user_repository]
-    ),
-    current_user: User = Depends(get_current_user),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> UserSchema:
 
-    existing_user = await user_repository.retrieve(email=user_update_schema.email)
-    if existing_user and existing_user.id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Недостаточно прав"
-        )
-
-    try:
-        updated_user = await user_repository.update(current_user.id, user_update_schema)
-        return UserSchema(**asdict(updated_user))
-
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Пользователь не найден"
-        )
+    service = services_factory.get_user_service(identity_provider=identity_provider)
+    updated_user = await service.edit_user(user_update_schema)
+    return UserSchema(**asdict(updated_user))

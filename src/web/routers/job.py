@@ -1,11 +1,9 @@
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from dependencies import get_current_user, is_company
-from dependencies.containers import RepositoriesContainer
-from models import User
-from repositories.job_repository import JobRepository
-from tools.exceptions import InvalidSalaryRangeError
+from dependencies.containers import Container, get_identity_provider
+from interfaces.i_identity_provider import IdentityProvider
+from services.factory import ServicesFactory
 from web.schemas.job import JobSchema, JobCreateSchema, JobUpdateSchema
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -16,11 +14,11 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 async def read_jobs(
     limit: int = 100,
     skip: int = 0,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> list[JobSchema]:
-    jobs_model = await job_repository.retrieve_many(limit, skip)
+    service = services_factory.get_job_service(identity_provider)
+    jobs_model = await service.get_all_jobs(limit=limit, skip=skip)
 
     jobs_schema = []
     for model in jobs_model:
@@ -42,11 +40,11 @@ async def read_jobs(
 @inject
 async def read_job(
     job_id: int,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> JobSchema:
-    job_model = await job_repository.retrieve(id=job_id)
+    service = services_factory.get_job_service(identity_provider)
+    job_model = await service.get_by_id(job_id)
 
     job_schema = JobSchema(
         id=job_model.id,
@@ -60,23 +58,18 @@ async def read_job(
     return job_schema
 
 
-@router.post(
-    "", description="Создание новой вакансии", dependencies=[Depends(is_company)]
-)
+@router.post("", description="Создание новой вакансии")
 @inject
 async def create_job(
     job_create_dto: JobCreateSchema,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
-    current_user: User = Depends(get_current_user),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> JobSchema:
-    job = await job_repository.create(
-        job_create_dto=job_create_dto, user_id=current_user.id
-    )
+    service = services_factory.get_job_service(identity_provider)
+    job = await service.create(job_create_dto)
     return JobSchema(
         id=job.id,
-        user_id=current_user.id,
+        user_id=job.user_id,
         title=job.title,
         description=job.description,
         salary_from=job.salary_from,
@@ -88,37 +81,19 @@ async def create_job(
 @router.patch(
     "/{job_id}",
     description="Редактирование вакансии",
-    dependencies=[Depends(is_company)],
 )
 @inject
 async def update_job(
     job_id: int,
     job_update_schema: JobUpdateSchema,
-    job_repository: JobRepository = Depends(
-        Provide[RepositoriesContainer.job_repository]
-    ),
-    current_user: User = Depends(get_current_user),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
+    identity_provider: IdentityProvider = Depends(get_identity_provider),
 ) -> JobSchema:
-    existing_job = await job_repository.retrieve(id=job_id)
-    if existing_job.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Недостаточно прав"
-        )
-    new_salary_from = job_update_schema.salary_from or existing_job.salary_from
-    new_salary_to = job_update_schema.salary_to or existing_job.salary_to
-    if (
-        new_salary_from is not None
-        and new_salary_to is not None
-        and new_salary_from > new_salary_to
-    ):
-        raise InvalidSalaryRangeError(
-            salary_from=new_salary_from, salary_to=new_salary_to
-        )
-
-    updated_job = await job_repository.update(existing_job.id, job_update_schema)
+    service = services_factory.get_job_service(identity_provider)
+    updated_job = await service.update(job_id, job_update_schema)
     return JobSchema(
         id=updated_job.id,
-        user_id=current_user.id,
+        user_id=updated_job.user_id,
         title=updated_job.title,
         description=updated_job.description,
         salary_from=updated_job.salary_from,

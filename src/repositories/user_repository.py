@@ -5,8 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from interfaces import IRepositoryAsync
-from models import Job as JobModel
-from models import Response as ResponseModel
 from models import User as UserModel
 from repositories.mapper import DynamicMapper
 from storage.sqlalchemy.tables import User
