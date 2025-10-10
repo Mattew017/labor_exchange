@@ -18,8 +18,12 @@ class Job(Base):
     # добавьте ваши колонки сюда
     title: Mapped[str] = mapped_column(comment="Название вакансии")
     description: Mapped[str] = mapped_column(comment="Описание вакансии")
-    salary_from: Mapped[Decimal] = mapped_column(Numeric(10, 2), comment="Зарплата от")
-    salary_to: Mapped[Decimal] = mapped_column(Numeric(10, 2), comment="Зарплата до")
+    salary_from: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), comment="Зарплата от", nullable=True
+    )
+    salary_to: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), comment="Зарплата до", nullable=True
+    )
     is_active: Mapped[bool] = mapped_column(
         comment="Активна ли вакансия", default=True, server_default="True"
     )

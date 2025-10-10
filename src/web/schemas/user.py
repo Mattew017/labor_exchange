@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, Annotated
 
-from pydantic import BaseModel, EmailStr, constr, model_validator
+from pydantic import BaseModel, EmailStr, model_validator, StringConstraints
 from typing_extensions import Self
 
 
@@ -20,7 +20,7 @@ class UserUpdateSchema(BaseModel):
 class UserCreateSchema(BaseModel):
     name: str
     email: EmailStr
-    password: constr(min_length=8)
+    password: Annotated[str, StringConstraints(min_length=8)]
     password2: str
     is_company: bool = False
 
