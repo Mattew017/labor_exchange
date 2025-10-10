@@ -33,3 +33,12 @@ class InvalidSalaryRangeError(DomainError):
 
     def __str__(self):
         return f"Минимальная зарплата {self.salary_from} не может быть больше максимальной {self.salary_to}"
+
+
+class PermissionDeniedError(DomainError):
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message

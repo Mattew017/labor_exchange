@@ -11,6 +11,7 @@ from tools.exceptions import (
     InactiveJobError,
     DuplicateResponseError,
     InvalidSalaryRangeError,
+    PermissionDeniedError,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,4 +54,11 @@ def input_params_validation_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=jsonable_encoder({"details": str(exc)}),
+    )
+
+
+def permission_denied_exception_handler(request: Request, exc: PermissionDeniedError):
+    logger.exception("Permission Denied: %s", exc, exc_info=exc)
+    return JSONResponse(
+        status_code=status.HTTP_403_FORBIDDEN, content={"message": str(exc)}
     )
