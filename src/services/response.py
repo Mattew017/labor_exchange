@@ -37,8 +37,8 @@ class ResponseService(ServiceInterface):
             limit,
             skip,
             include_relations=True,
-            is_active=True,
         )
+        responses_model = [r for r in responses_model if r.job.is_active]
         return responses_model
 
     async def get_by_job_id(self, job_id: str, limit: int, skip: int) -> list[Response]:
