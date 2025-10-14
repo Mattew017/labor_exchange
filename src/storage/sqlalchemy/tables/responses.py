@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from storage.sqlalchemy.client import Base
@@ -22,3 +22,7 @@ class Response(Base):
 
     user: Mapped["User"] = relationship(back_populates="responses")  # noqa
     job: Mapped["Job"] = relationship(back_populates="responses")  # noqa
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_response"),
+    )

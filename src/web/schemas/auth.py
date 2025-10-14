@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from typing import Annotated
+
+from pydantic import BaseModel, EmailStr, StringConstraints
 
 
 class TokenSchema(BaseModel):
@@ -8,4 +10,4 @@ class TokenSchema(BaseModel):
 
 class LoginSchema(BaseModel):
     email: EmailStr
-    password: str
+    password: Annotated[str, StringConstraints(min_length=8)]

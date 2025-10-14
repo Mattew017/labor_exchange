@@ -1,9 +1,9 @@
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from dependencies.containers import RepositoriesContainer
-from repositories import UserRepository
-from tools.security import create_access_token, verify_password
+from dependencies.containers import Container
+from services.factory import ServicesFactory
+
 from web.schemas import LoginSchema, TokenSchema
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -13,14 +13,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @inject
 async def login(
     login_data: LoginSchema,
-    users_repository: UserRepository = Depends(Provide[RepositoriesContainer.user_repository]),
+    services_factory: ServicesFactory = Depends(Provide[Container.services_factory]),
 ):
-    user = await users_repository.retrieve(email=login_data.email, include_relations=False)
+    service = services_factory.get_auth_service()
+    res = await service.authenticate(
+        email=login_data.email, password=login_data.password
+    )
 
-    if user is None or not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Некорректное имя пользователя или пароль",
-        )
-
-    return TokenSchema(access_token=create_access_token({"sub": user.email}), token_type="Bearer")
+    return TokenSchema(access_token=res.acces_token, token_type=res.token_type)
