@@ -2,7 +2,6 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,33 +14,36 @@ from sqlalchemy.orm import sessionmaker
 from config import DBSettings
 from dependencies.containers import setup_mappers
 from main import app
-from repositories import UserRepository, JobRepository, ResponseRepository
+from models import Job as JobModel
+from models import Response as ResponseModel
+from models import User as UserModel
+from repositories import JobRepository, ResponseRepository, UserRepository
+from storage.sqlalchemy.tables import Job, Response, User
 from tools.fixtures.users import UserFactory
-
-from models import User as UserModel, Job as JobModel, Response as ResponseModel
-from storage.sqlalchemy.tables import User, Job, Response
-
 
 env_file_name = ".env." + os.environ.get("STAGE", "test")
 env_file_path = Path(__file__).parent.parent.resolve() / env_file_name
 settings = DBSettings(_env_file=env_file_path)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def client_app():
     client = TestClient(app)
     return client
 
 
-@pytest_asyncio.fixture(scope="function")
-async def sa_session():
+@pytest.fixture(scope="session")
+def sa_engine():
     engine = create_async_engine(str(settings.pg_async_dsn))
-    connection = await engine.connect()
+    return engine
+
+
+@pytest_asyncio.fixture(scope="function")
+async def sa_session(sa_engine):
+    connection = await sa_engine.connect()
     trans = await connection.begin()
 
-    Session = sessionmaker(
-        connection, expire_on_commit=False, class_=AsyncSession
-    )  # noqa
+    Session = sessionmaker(connection, expire_on_commit=False, class_=AsyncSession)  # noqa
     session = Session()
 
     deletion = session.delete
@@ -71,10 +73,10 @@ async def sa_session():
         await session.close()
         await trans.rollback()
         await connection.close()
-        await engine.dispose()
+        await sa_engine.dispose()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def repos_mapper():
     mapper_factory = setup_mappers()
     return mapper_factory
@@ -82,17 +84,13 @@ def repos_mapper():
 
 @pytest_asyncio.fixture(scope="function")
 async def user_repository(sa_session, repos_mapper):
-    repository = UserRepository(
-        session=sa_session, mapper=repos_mapper.get_mapper(UserModel, User)
-    )
+    repository = UserRepository(session=sa_session, mapper=repos_mapper.get_mapper(UserModel, User))
     yield repository
 
 
 @pytest_asyncio.fixture(scope="function")
 async def job_repository(sa_session, repos_mapper):
-    repository = JobRepository(
-        session=sa_session, mapper=repos_mapper.get_mapper(JobModel, Job)
-    )
+    repository = JobRepository(session=sa_session, mapper=repos_mapper.get_mapper(JobModel, Job))
     yield repository
 
 
