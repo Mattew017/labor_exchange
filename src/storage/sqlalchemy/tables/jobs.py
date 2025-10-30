@@ -31,4 +31,4 @@ class Job(Base):
         comment="Дата создания записи", default=datetime.utcnow
     )
     user: Mapped["User"] = relationship(back_populates="jobs")  # noqa
-    responses: Mapped["Response"] = relationship(back_populates="job")  # noqa
+    responses: Mapped[list["Response"]] = relationship(back_populates="job")  # noqa

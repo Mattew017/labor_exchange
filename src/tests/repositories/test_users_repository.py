@@ -2,10 +2,10 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from repositories import UserRepository
-from storage.sqlalchemy.tables import Job
-from tools.fixtures.users import UserFactory
 from services.identity_provider import hash_password
+from storage.sqlalchemy.tables import Job
+from tools.exceptions import EntityNotFoundError
+from tools.fixtures.users import UserFactory
 from web.schemas import UserCreateSchema, UserUpdateSchema
 
 
@@ -30,7 +30,7 @@ async def test_get_all(user_repository, sa_session):
 async def test_get_all_with_relations(user_repository, sa_session):
     async with sa_session() as session:
         user = UserFactory.build(is_company=True)
-        job = Job(user_id=user.id)
+        job = Job(user_id=user.id, title="test", description="test")
         session.add(user)
         session.add(job)
         session.flush()
@@ -78,8 +78,7 @@ async def test_create(user_repository, sa_session):
 
 
 @pytest.mark.asyncio
-async def test_create_password_mismatch(sa_session):
-    repository = UserRepository(session=sa_session)
+async def test_create_password_mismatch(user_repository):
     with pytest.raises(ValidationError):
         user = UserCreateSchema(
             name="Uchpochmak",
@@ -88,7 +87,7 @@ async def test_create_password_mismatch(sa_session):
             password2="eshkero!",
             is_company=False,
         )
-        await repository.create(
+        await user_repository.create(
             user_create_dto=user, hashed_password=hash_password(user.password)
         )
 
@@ -102,7 +101,7 @@ async def test_update(user_repository, sa_session):
 
     user_update_dto = UserUpdateSchema(name="updated_name")
     updated_user = await user_repository.update(
-        id=user.id, user_update_dto=user_update_dto
+        id_=user.id, user_update_dto=user_update_dto
     )
     assert user.id == updated_user.id
     assert updated_user.name == "updated_name"
@@ -120,7 +119,7 @@ async def test_update_email_from_other_user(user_repository, sa_session):
     user_update_dto = UserUpdateSchema(email=user.email)
 
     with pytest.raises(IntegrityError):
-        await user_repository.update(id=user2.id, user_update_dto=user_update_dto)
+        await user_repository.update(id_=user2.id, user_update_dto=user_update_dto)
 
 
 @pytest.mark.asyncio
@@ -130,6 +129,6 @@ async def test_delete(user_repository, sa_session):
         session.add(user)
         session.flush()
 
-    await user_repository.delete(id=user.id)
-    res = await user_repository.retrieve(id=user.id)
-    assert not res
+    await user_repository.delete(id_=user.id)
+    with pytest.raises(EntityNotFoundError):
+        await user_repository.retrieve(id=user.id)
