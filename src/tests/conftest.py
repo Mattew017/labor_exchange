@@ -19,6 +19,8 @@ from models import Response as ResponseModel
 from models import User as UserModel
 from repositories import JobRepository, ResponseRepository, UserRepository
 from storage.sqlalchemy.tables import Job, Response, User
+from tools.fixtures.jobs import JobFactory
+from tools.fixtures.responses import ResponseFactory
 from tools.fixtures.users import UserFactory
 
 env_file_name = ".env." + os.environ.get("STAGE", "test")
@@ -106,3 +108,5 @@ async def response_repository(sa_session, repos_mapper):
 @pytest_asyncio.fixture(scope="function", autouse=True)
 def setup_factories(sa_session: AsyncSession) -> None:
     UserFactory.session = sa_session
+    JobFactory.session = sa_session
+    ResponseFactory.session = sa_session
