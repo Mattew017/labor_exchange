@@ -4,27 +4,21 @@ from models import User
 from repositories import UserRepository
 from services.identity_provider import hash_password
 from tools.exceptions import PermissionDeniedError
-from web.schemas import UserUpdateSchema, UserCreateSchema
+from web.schemas import UserCreateSchema, UserUpdateSchema
 
 
 class UserService(ServiceInterface):
-    def __init__(
-        self, user_repository: UserRepository, identity_provider: IdentityProvider
-    ):
+    def __init__(self, user_repository: UserRepository, identity_provider: IdentityProvider):
         self.user_repository = user_repository
         self.identity_provider = identity_provider
 
     async def edit_user(self, user_update_schema: UserUpdateSchema) -> User:
         current_user = await self.identity_provider.get_current_user()
-        existing_user = await self.user_repository.retrieve(
-            email=user_update_schema.email
-        )
+        existing_user = await self.user_repository.retrieve(email=current_user.email)
         if existing_user and existing_user.id != current_user.id:
             raise PermissionDeniedError("Недостаточно прав на это действие")
 
-        updated_user = await self.user_repository.update(
-            current_user.id, user_update_schema
-        )
+        updated_user = await self.user_repository.update(current_user.id, user_update_schema)
         return updated_user
 
     async def get_all_users(self, limit: int, skip: int) -> list[User]:

@@ -12,7 +12,7 @@ from services.identity_provider import JWTIdentityProvider, http_credentials_sec
 from storage.sqlalchemy.tables import User, Job, Response
 
 
-def setup_mappers():
+def setup_mappers() -> MapperFactory:
     factory = MapperFactory()
     factory.register(
         UserModel,
